@@ -1,72 +1,92 @@
-// import React, { useEffect, useState } from "react";
-// import { View, Text, StyleSheet, Alert } from "react-native";
-// import { Camera, useCameraDevices } from "react-native-vision-camera";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useEffect, useState } from "react";
+import { BarCodeScanner } from "expo-barcode-scanner";
+import { useFocusEffect } from "@react-navigation/native";
+import Button from "../components/Button";
 
-// const QrScanScreen = () => {
-//   const [hasPermission, setHasPermission] = useState(false);
-//   const devices = useCameraDevices();
-//   const device = devices.back;
+const QRScanner = ({ navigation }) => {
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanned, setScanned] = useState(false);
+  const [key, setKey] = useState(0);
 
-//   useEffect(() => {
-//     (async () => {
-//       const status = await Camera.requestCameraPermission();
-//       setHasPermission(status === "authorized");
-//     })();
-//   }, []);
+  useEffect(() => {
+    (async () => {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      setHasPermission(status === "granted");
+    })();
+  }, []);
 
-//   const onCodeScanned = (code) => {
-//     Alert.alert("QR Code Detected", code);
-//   };
+  useFocusEffect(
+    React.useCallback(() => {
+      setScanned(false);
+      setKey((prevKey) => prevKey + 1); // Force re-rendering of the scanner
+    }, [])
+  );
 
-//   if (!device) return <Text>Camera not available</Text>;
+  const handleBarCodeScanned = ({ type, data }) => {
+    setScanned(true);
+    navigation.navigate("Preview", { url: data });
+  };
 
-//   return (
-//     <View style={styles.container}>
-//       {hasPermission ? (
-//         <Camera
-//           style={styles.camera}
-//           device={device}
-//           isActive={true}
-//           onCodeScanned={(codes) => {
-//             if (codes.length > 0) {
-//               onCodeScanned(codes[0].value);
-//             }
-//           }}
-//         />
-//       ) : (
-//         <Text>No Permission Granted</Text>
-//       )}
-//     </View>
-//   );
-// };
+  if (hasPermission === null) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="black" />
+      </View>
+    );
+  }
+  if (hasPermission === false) {
+    return <Text>No access to camera</Text>;
+  }
 
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   camera: {
-//     width: 300,
-//     height: 300,
-//     borderRadius: 20,
-//     overflow: "hidden",
-//   },
-// });
-
-// export default QrScanScreen;
-
-import { StyleSheet, Text, View } from "react-native";
-import React from "react";
-
-const QrScanScreen = () => {
   return (
-    <View>
-      <Text>QrScanScreen</Text>
+    <View style={styles.container}>
+      <Text style={styles.text}>Scan QR Code</Text>
+      <Text style={styles.description}>
+        Place the QR code properly inside the area. Scanning will happen
+        automatically.
+      </Text>
+      <View style={styles.qrContainer}>
+        <BarCodeScanner
+          key={key} // Force re-rendering
+          onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+          style={{ height: 532 }}
+        />
+      </View>
+      {scanned && (
+        <Button text={"Tap to Scan Again"} action={() => setScanned(false)} />
+      )}
     </View>
   );
 };
 
-export default QrScanScreen;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 50,
+  },
+  text: {
+    color: "black",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  description: {
+    fontSize: 16,
+    margin: 10,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+  qrContainer: {
+    marginBottom: 40,
+    width: 300,
+    height: 300,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginVertical: 20,
+  },
+});
 
-const styles = StyleSheet.create({});
+export default QRScanner;

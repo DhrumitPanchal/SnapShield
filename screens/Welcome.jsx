@@ -3,12 +3,12 @@ import UrlScreen from "./UrlScreen";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Icon from "../assets/icons";
 import QrScanScreen from "./QrScanScreen";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Image } from "react-native";
 
 const Tab = createBottomTabNavigator();
 
-const CustomHeader = ({ title }) => {
+const CustomHeader = ({ title, action }) => {
   return (
     <View style={styles.container}>
       <Image
@@ -17,14 +17,14 @@ const CustomHeader = ({ title }) => {
       />
       <Text style={styles.text}>{title}</Text>
 
-      <View style={styles.icon}>
+      <TouchableOpacity style={styles.icon} onPress={action}>
         <Text>DB</Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
 
-const Welcome = () => {
+const Welcome = ({ navigation }) => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -36,7 +36,7 @@ const Welcome = () => {
                   name={"home"}
                   size={30}
                   stroke={1}
-                  color={focused ? "black" : "rgba(46, 46, 46, 0.38)"}
+                  color={focused ? "black" : "#2e2e2e"}
                 />
               </View>
             );
@@ -48,7 +48,7 @@ const Welcome = () => {
                   name={"qr"}
                   size={30}
                   stroke={1}
-                  color={focused ? "black" : "rgba(46, 46, 46, 0.38)"}
+                  color={focused ? "black" : "#2e2e2e"}
                 />
               </View>
             );
@@ -60,13 +60,23 @@ const Welcome = () => {
       <Tab.Screen
         name="Url"
         options={{
-          headerTitle: () => <CustomHeader title="LINK CHECKER" />,
+          headerTitle: () => (
+            <CustomHeader
+              title="LINK CHECKER"
+              action={() => navigation.navigate("Profile")}
+            />
+          ),
         }}
         component={UrlScreen}
       />
       <Tab.Screen
         options={{
-          headerTitle: () => <CustomHeader title="QR SCANNER" />,
+          headerTitle: () => (
+            <CustomHeader
+              title="QR SCANNER"
+              action={() => navigation.navigate("Profile")}
+            />
+          ),
         }}
         name="QrCode"
         component={QrScanScreen}
@@ -97,7 +107,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 100,
-    backgroundColor: "hsla(0, 0.00%, 18.00%, 0.20)",
+    backgroundColor: "#2e2e2e",
     alignItems: "center",
   },
   logo: {

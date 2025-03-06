@@ -1,13 +1,22 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Alert, Modal } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Alert,
+  Modal,
+  Image,
+  TouchableOpacity,
+} from "react-native";
 import { WebView } from "react-native-webview";
 import { Text } from "react-native";
 import Button from "../components/Button";
+import Icon from "../assets/icons/index";
 
-const PreviewScreen = ({ route }) => {
+const PreviewScreen = ({ route, navigation }) => {
   const [popup, setPopup] = useState(false);
   const [score, setScore] = useState(0);
+  const [certificate, setCertificate] = useState(null);
   const { url } = route.params;
   const GOOGLE_API_KEY =
     "47e4d92aafb1f1a2fe07b7373eedd7d9a47af18504a623ee76dc4e6ae8bb2d2e";
@@ -31,7 +40,7 @@ const PreviewScreen = ({ route }) => {
     };
 
     try {
-      // First request to submit the URL for scanning
+      // Submit the URL for scanning
       const response = await fetch(
         "https://www.virustotal.com/api/v3/urls",
         options
@@ -40,13 +49,15 @@ const PreviewScreen = ({ route }) => {
 
       if (response.ok && data.data) {
         const id = data.data.id;
-        console.log("Scan ID:", id);
+        // console.log("Scan ID:", id);
 
-        // Polling the API every 5 seconds to check the result
         let attempts = 0;
         let result = null;
 
-        while (attempts < 10) {
+        // Wait for 5 seconds before polling (optional but helps API process request)
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        while (attempts < 15) {
           const check = await axios.get(
             `https://www.virustotal.com/api/v3/analyses/${id}`,
             {
@@ -59,37 +70,53 @@ const PreviewScreen = ({ route }) => {
 
           const status = check.data.data.attributes.status;
           console.log(`Attempt ${attempts + 1}: ${status}`);
+          console.log("api data -------------------------------------");
+          const filteredResults = Object.entries(
+            check.data.data.attributes?.results
+          )
+            .filter(
+              ([key, value]) =>
+                value.method === "blacklist" &&
+                (value.result === "clean" || value.result === "unrated")
+            )
+            .reduce((acc, [key, value]) => {
+              acc[key] = value;
+              return acc;
+            }, {});
 
+          console.log(filteredResults);
+          console.log("api data -------------------------------------");
           if (status === "completed") {
             result = check.data;
             break;
           }
 
-          // Wait for 5 seconds before trying again
           await new Promise((resolve) => setTimeout(resolve, 5000));
           attempts++;
         }
 
         if (result) {
           const malicious = result.data.attributes.stats.malicious;
+
+          setScore(malicious);
+
           if (malicious > 0) {
-            setScore((pre) => pre + malicious);
-            return setPopup(true);
+            setPopup(true);
           } else {
-            setScore(0);
-            return setPopup(false);
+            setPopup(false);
           }
         } else {
           Alert.alert("Error", "URL scan took too long or failed.");
         }
       } else {
-        Alert.alert("Warning ❌", "Failed to check the URL!");
+        // Alert.alert("Warning ❌", "Failed to check the URL!");
       }
     } catch (error) {
       console.error("Error checking URL:", error);
-      Alert.alert("Error", "Unable to check the website.");
+      // Alert.alert("Error", "Unable to check the website.");
     }
   };
+
   async function checkDomain() {
     try {
       // Extract domain from URL
@@ -102,6 +129,16 @@ const PreviewScreen = ({ route }) => {
             "x-apikey": GOOGLE_API_KEY,
           },
         }
+      );
+
+      const certificate = response.data.data.attributes.last_https_certificate;
+      certificate && setCertificate(certificate);
+      console.log(
+        "check Domain -----------------------------------------------"
+      );
+      console.log(response.data.data.attributes.creation_date);
+      console.log(
+        "check Domain -----------------------------------------------"
       );
 
       const { data } = response;
@@ -143,7 +180,41 @@ const PreviewScreen = ({ route }) => {
       Alert.alert("Error", "Unable to check the domain.");
     }
   }
+  const showMoreDetails = () => {
+    navigation.navigate("Details", {
+      url,
+      score,
+      certificate,
+    });
+  };
 
+  const handleDownloadRequest = (event) => {
+    const downloadExtensions = [".pdf", ".apk", ".zip", ".docx", ".xlsx"];
+    const isDownloadable = downloadExtensions.some((ext) =>
+      event.url.includes(ext)
+    );
+
+    if (isDownloadable) {
+      Alert.alert(
+        "Download Confirmation",
+        "This site is trying to download a file. Do you want to proceed?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Download",
+            onPress: () => {
+              Linking.openURL(event.url); // Open the URL to start the download
+            },
+          },
+        ]
+      );
+      return false; // Prevent WebView from auto-downloading
+    }
+    return true; // Allow normal navigation
+  };
   useEffect(() => {
     checkDomain();
     checkURL();
@@ -151,6 +222,39 @@ const PreviewScreen = ({ route }) => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Image
+            style={styles.back}
+            source={require("../assets/icons/back.png")}
+          />
+        </TouchableOpacity>
+        {certificate ? (
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert(
+                "Secure Network",
+                `SSL Certification Verified\nValid Until: ${new Date(
+                  certificate.validity.not_after
+                ).toDateString()}`
+              )
+            }
+          >
+            <Icon name="lock" size={24} color="black" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert(
+                "Insecure Network",
+                "No valid SSL certificate found. This website may not be secure!"
+              )
+            }
+          >
+            <Icon name="unsafe" size={24} color="red" />
+          </TouchableOpacity>
+        )}
+      </View>
       <Modal
         style={styles.popupContainer}
         visible={popup}
@@ -160,16 +264,20 @@ const PreviewScreen = ({ route }) => {
       >
         <View style={styles.cardContainer}>
           <View style={styles.box}>
-            <View style={styles.resultContainer}>
-              <Text style={styles.resultText}>{score}</Text>
-              <Text style={styles.resultText}>/</Text>
-              <Text style={styles.resultText}>96</Text>
-            </View>
-
+            <Image
+              style={styles.alertImage}
+              source={require("../assets/icons/warning.png")}
+            />
             <Text>
-              This website might be unsafe! Proceed with caution, as it could
-              pose security risks to your data and privacy
+              This website might be unsafe! Proceed with caution, as it failed
+              {` ${score} out of 96`} security test cases, potentially posing
+              risks to your data and privacy.
             </Text>
+            <TouchableOpacity onPress={showMoreDetails}>
+              <Text style={{ color: "blue", textDecorationLine: "underline" }}>
+                Show more details
+              </Text>
+            </TouchableOpacity>
             <Button text={"Close"} action={() => setPopup(false)} />
           </View>
         </View>
@@ -179,16 +287,40 @@ const PreviewScreen = ({ route }) => {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         cacheEnabled={false}
+        allowFileAccess={false}
+        allowFileAccessFromFileURLs={false}
+        allowUniversalAccessFromFileURLs={false}
+        mixedContentMode="never"
+        incognito={true}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           Alert.alert("Error", nativeEvent.description);
         }}
+        onShouldStartLoadWithRequest={handleDownloadRequest} // Handle download request
+        injectedJavaScript={`
+  window.open = function(){ return false; };
+  window.XMLHttpRequest = function(){ return false; };
+`}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerContainer: {
+    position: "relative",
+    left: 0,
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    width: "100%",
+    height: 60,
+    borderBlockColor: "black",
+    borderBottomWidth: 1,
+  },
   container: {
     flex: 1,
   },
@@ -202,7 +334,7 @@ const styles = StyleSheet.create({
     display: "flex",
     justifyContent: "center",
     alignContent: "center",
-    backgroundColor: "rgba(46, 46, 46, 0.38)s",
+    backgroundColor: "#2e2e2es",
   },
   box: {
     paddingTop: 40,
@@ -211,7 +343,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    height: 400,
+    height: 370,
     width: "80%",
     borderRadius: 20,
     marginHorizontal: "auto",
@@ -231,6 +363,14 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 30,
     fontWeight: "800",
+  },
+  back: {
+    height: 20,
+    width: 20,
+  },
+  alertImage: {
+    height: 100,
+    width: 100,
   },
 });
 
