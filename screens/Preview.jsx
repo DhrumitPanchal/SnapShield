@@ -74,7 +74,6 @@ const PreviewScreen = ({ route, navigation }) => {
 
           const status = check.data.data.attributes.status;
           console.log(`Attempt ${attempts + 1}: ${status}`);
-
           const filteredResults = Object.entries(
             check.data.data.attributes?.results
           )
