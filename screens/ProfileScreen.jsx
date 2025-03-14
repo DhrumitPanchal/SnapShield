@@ -1,9 +1,17 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import React, { useContext, useEffect, useState } from "react";
 import Icon from "../assets/icons";
 import * as Application from "expo-application";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Context } from "../context";
+import { CommonActions } from "@react-navigation/native";
 
 const ListCard = ({ name, des, action, icon }) => {
   return (
@@ -53,9 +61,26 @@ const ProfileScreen = ({ navigation }) => {
   ];
 
   const logout = async () => {
-    await AsyncStorage.removeItem("user");
-    setUser(null);
-    navigation.navigate("Login");
+    Alert.alert("Confirmation", "Are you sure you want to logout?", [
+      {
+        text: "Yes",
+        onPress: async () => {
+          await AsyncStorage.removeItem("user");
+          setUser(null);
+          // navigation.replace("Login");
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: "Login" }], // Reset navigation to Login screen
+            })
+          );
+        },
+      },
+      {
+        text: "No",
+        onPress: () => {},
+      },
+    ]);
   };
 
   return (
